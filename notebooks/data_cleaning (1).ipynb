@@ -1,0 +1,491 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Week 1 \u2013 Data Acquisition, Cleaning, and Preprocessing\n",
+    "\n",
+    "## Laptop Price Dataset\n",
+    "\n",
+    "This notebook documents the complete data-cleaning workflow using the actual `laptopData (1).csv` dataset.\n",
+    "\n",
+    "### Objectives\n",
+    "- Load and explore the raw dataset\n",
+    "- Identify missing values and duplicates\n",
+    "- Clean inconsistent and erroneous entries\n",
+    "- Detect outliers using the IQR method\n",
+    "- Extract useful numerical and categorical features\n",
+    "- Visualize the cleaned data\n",
+    "- Save an analysis-ready CSV\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "\n",
+    "pd.set_option(\"display.max_columns\", None)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 1. Load the Raw Dataset\n",
+    "\n",
+    "The original dataset is loaded without changing it."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df = pd.read_csv(\"../data/raw/laptopData (1).csv\")\n",
+    "\n",
+    "print(\"Dataset loaded successfully\")\n",
+    "print(\"Shape:\", df.shape)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df.head()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 2. Initial Data Exploration"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\"Rows:\", df.shape[0])\n",
+    "print(\"Columns:\", df.shape[1])\n",
+    "print(\"\\nColumn names:\")\n",
+    "print(df.columns.tolist())\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df.info()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df.describe(include='all').T"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 3. Missing-Value Analysis"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "missing_summary = pd.DataFrame({\n",
+    "    \"Missing Values\": df.isna().sum(),\n",
+    "    \"Missing Percentage\": (df.isna().mean() * 100).round(2)\n",
+    "})\n",
+    "missing_summary\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "missing_rows = df.isna().any(axis=1).sum()\n",
+    "print(\"Rows containing at least one missing value:\", missing_rows)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Cleaning decision\n",
+    "Incomplete rows are removed because the missing records do not contain enough information to reliably reconstruct complete laptop specifications. This avoids inventing values for important fields such as price, CPU, GPU, or manufacturer.\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 4. Duplicate Analysis"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "duplicate_count = df.duplicated().sum()\n",
+    "print(\"Exact duplicate rows:\", duplicate_count)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 5. Basic Cleaning"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "if \"Unnamed: 0\" in df.columns:\n",
+    "    df = df.drop(columns=[\"Unnamed: 0\"])\n",
+    "\n",
+    "df = df.dropna().copy()\n",
+    "df = df.drop_duplicates().copy()\n",
+    "\n",
+    "print(\"Shape after basic cleaning:\", df.shape)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 6. Convert Text-Based Numerical Fields"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df[\"Inches\"] = pd.to_numeric(df[\"Inches\"], errors=\"coerce\")\n",
+    "\n",
+    "df[\"Ram_GB\"] = (\n",
+    "    df[\"Ram\"].str.extract(r\"(\\d+(?:\\.\\d+)?)\")[0].astype(float)\n",
+    ")\n",
+    "\n",
+    "df[\"Weight_kg\"] = (\n",
+    "    df[\"Weight\"].str.extract(r\"(\\d+(?:\\.\\d+)?)\")[0].astype(float)\n",
+    ")\n",
+    "\n",
+    "df[\"CPU_GHz\"] = (\n",
+    "    df[\"Cpu\"].str.extract(r\"(\\d+(?:\\.\\d+)?)GHz\")[0].astype(float)\n",
+    ")\n",
+    "\n",
+    "df[[\"Inches\", \"Ram\", \"Ram_GB\", \"Weight\", \"Weight_kg\", \"CPU_GHz\"]].head(10)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 7. Detect and Correct an Erroneous Weight Entry\n",
+    "\n",
+    "A laptop weight below 0.5 kg is treated as implausible in this dataset."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "invalid_weight = df[\"Weight_kg\"] < 0.5\n",
+    "\n",
+    "print(\"Potentially erroneous weight records:\", invalid_weight.sum())\n",
+    "df.loc[invalid_weight, [\"Company\", \"TypeName\", \"Weight\", \"Weight_kg\", \"Price\"]]\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "valid_median_weight = df.loc[~invalid_weight, \"Weight_kg\"].median()\n",
+    "df.loc[invalid_weight, \"Weight_kg\"] = valid_median_weight\n",
+    "\n",
+    "print(\"Replacement median weight:\", round(valid_median_weight, 2), \"kg\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Rationale\n",
+    "The value `0.0002 kg` is physically implausible for a laptop. The rest of the record is retained, while the invalid weight is replaced by the median of valid weights.\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 8. Extract Screen Features"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "resolution = df[\"ScreenResolution\"].str.extract(r\"(\\d{3,5})x(\\d{3,5})\")\n",
+    "\n",
+    "df[\"ScreenWidth_px\"] = pd.to_numeric(resolution[0], errors=\"coerce\")\n",
+    "df[\"ScreenHeight_px\"] = pd.to_numeric(resolution[1], errors=\"coerce\")\n",
+    "\n",
+    "df[\"Touchscreen\"] = df[\"ScreenResolution\"].str.contains(\n",
+    "    \"Touchscreen\", case=False, na=False\n",
+    ").astype(int)\n",
+    "\n",
+    "df[\"IPS\"] = df[\"ScreenResolution\"].str.contains(\n",
+    "    \"IPS\", case=False, na=False\n",
+    ").astype(int)\n",
+    "\n",
+    "df[[\"ScreenResolution\", \"ScreenWidth_px\", \"ScreenHeight_px\",\n",
+    "    \"Touchscreen\", \"IPS\"]].head(10)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 9. Extract CPU and GPU Brands"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df[\"CPU_Brand\"] = df[\"Cpu\"].str.split().str[0]\n",
+    "df[\"GPU_Brand\"] = df[\"Gpu\"].str.split().str[0]\n",
+    "\n",
+    "df[[\"Cpu\", \"CPU_Brand\", \"Gpu\", \"GPU_Brand\"]].head(10)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 10. Outlier Detection Using IQR\n",
+    "\n",
+    "The Interquartile Range method flags values below Q1 \u2212 1.5\u00d7IQR or above Q3 + 1.5\u00d7IQR. A statistical outlier is not automatically an error; legitimate premium laptops can have high prices or high RAM.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def iqr_analysis(series):\n",
+    "    q1 = series.quantile(0.25)\n",
+    "    q3 = series.quantile(0.75)\n",
+    "    iqr = q3 - q1\n",
+    "    lower = q1 - 1.5 * iqr\n",
+    "    upper = q3 + 1.5 * iqr\n",
+    "    flags = ((series < lower) | (series > upper)).sum()\n",
+    "    return q1, q3, iqr, lower, upper, int(flags)\n",
+    "\n",
+    "numeric_columns = [\"Price\", \"Inches\", \"Ram_GB\", \"Weight_kg\", \"CPU_GHz\"]\n",
+    "\n",
+    "results = []\n",
+    "for column in numeric_columns:\n",
+    "    q1, q3, iqr, lower, upper, flags = iqr_analysis(df[column])\n",
+    "    results.append([column, q1, q3, iqr, lower, upper, flags])\n",
+    "\n",
+    "iqr_table = pd.DataFrame(\n",
+    "    results,\n",
+    "    columns=[\"Variable\", \"Q1\", \"Q3\", \"IQR\", \"Lower Bound\", \"Upper Bound\", \"IQR Flags\"]\n",
+    ")\n",
+    "\n",
+    "iqr_table.round(2)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 11. Visual Exploration"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "plt.figure(figsize=(8,5))\n",
+    "plt.hist(df[\"Price\"], bins=30)\n",
+    "plt.title(\"Laptop Price Distribution\")\n",
+    "plt.xlabel(\"Price\")\n",
+    "plt.ylabel(\"Number of Laptops\")\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "plt.figure(figsize=(8,4))\n",
+    "plt.boxplot(df[\"Price\"], vert=False)\n",
+    "plt.title(\"Laptop Price \u2013 IQR Outlier Inspection\")\n",
+    "plt.xlabel(\"Price\")\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "plt.figure(figsize=(8,5))\n",
+    "plt.scatter(df[\"Ram_GB\"], df[\"Price\"], alpha=0.45)\n",
+    "plt.title(\"RAM vs Laptop Price\")\n",
+    "plt.xlabel(\"RAM (GB)\")\n",
+    "plt.ylabel(\"Price\")\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "company_counts = df[\"Company\"].value_counts().head(10).sort_values()\n",
+    "\n",
+    "plt.figure(figsize=(8,5))\n",
+    "company_counts.plot(kind=\"barh\")\n",
+    "plt.title(\"Top 10 Laptop Brands\")\n",
+    "plt.xlabel(\"Number of Records\")\n",
+    "plt.ylabel(\"Company\")\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 12. Final Quality Check"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\"Final dataset shape:\", df.shape)\n",
+    "print(\"\\nRemaining missing values:\")\n",
+    "print(df.isna().sum())\n",
+    "print(\"\\nRemaining duplicate rows:\", df.duplicated().sum())\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df[[\n",
+    "    \"Price\", \"Inches\", \"Ram_GB\", \"Weight_kg\", \"CPU_GHz\",\n",
+    "    \"ScreenWidth_px\", \"ScreenHeight_px\"\n",
+    "]].describe().T.round(2)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 13. Save the Cleaned Dataset"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "output_path = \"../data/cleaned/laptop_cleaned_week1.csv\"\n",
+    "\n",
+    "df.to_csv(output_path, index=False)\n",
+    "\n",
+    "print(\"Cleaned dataset saved to:\", output_path)\n",
+    "print(\"Final shape:\", df.shape)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 14. Summary\n",
+    "\n",
+    "The preprocessing workflow:\n",
+    "1. Loaded the original CSV.\n",
+    "2. Explored its structure and quality.\n",
+    "3. Identified and removed incomplete records.\n",
+    "4. Removed duplicate records.\n",
+    "5. Removed the unnecessary exported index.\n",
+    "6. Converted text-based numerical fields.\n",
+    "7. Corrected an implausible weight value.\n",
+    "8. Investigated outliers using IQR.\n",
+    "9. Extracted screen, CPU, and GPU features.\n",
+    "10. Visualized the cleaned data.\n",
+    "11. Saved the final dataset for future analysis.\n",
+    "\n",
+    "### Final Reflection\n",
+    "Cleaning improves consistency and makes the dataset suitable for further analysis and machine learning. However, removing records and correcting values can affect downstream results, so each decision has been documented and made reproducible.\n"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
